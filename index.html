@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Emoji大作战</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html,body{width:100%;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+body{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);display:flex;flex-direction:column;align-items:center;justify-content:center}
+
+/* 主容器 */
+#game{width:100%;max-width:420px;height:100vh;max-height:900px;position:relative;display:flex;flex-direction:column;align-items:center}
+
+/* 标题 */
+#title{color:#fff;text-align:center;margin-top:40px;flex-shrink:0}
+#title h1{font-size:32px;font-weight:800;text-shadow:0 2px 8px rgba(0,0,0,.3);letter-spacing:2px}
+#title p{font-size:14px;opacity:.8;margin-top:6px}
+
+/* 信息栏 */
+#info-bar{display:flex;justify-content:space-between;width:90%;margin-top:20px;flex-shrink:0}
+.info-box{background:rgba(255,255,255,.15);border-radius:12px;padding:8px 20px;text-align:center;backdrop-filter:blur(4px);min-width:90px}
+.info-label{font-size:11px;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:1px}
+.info-value{font-size:24px;font-weight:800;color:#fff;line-height:1.2}
+#score-value{color:#FFD93D}
+#timer-value{color:#FF6B6B}
+
+/* 游戏网格 */
+#grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:90%;margin-top:20px;aspect-ratio:1/1;flex-shrink:0}
+.cell{background:rgba(255,255,255,.1);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:48px;cursor:pointer;position:relative;overflow:hidden;border:2px solid rgba(255,255,255,.08);transition:transform .1s}
+.cell:active{transform:scale(.93)}
+.cell.active{background:rgba(255,255,255,.25);border-color:rgba(255,255,255,.4)}
+.cell .emoji{opacity:0;transform:scale(.3) rotate(-20deg);transition:all .15s ease-out}
+.cell.active .emoji{opacity:1;transform:scale(1) rotate(0deg)}
+.cell.hit .emoji{opacity:0;transform:scale(1.8) rotate(30deg);transition:all .12s ease-out}
+
+/* 粒子效果 */
+.particle{position:absolute;font-size:20px;pointer-events:none;animation:particleFly .5s ease-out forwards}
+@keyframes particleFly{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.5)}}
+
+/* 分数飘字 */
+.score-pop{position:absolute;font-size:18px;font-weight:800;color:#FFD93D;pointer-events:none;animation:scorePop .6s ease-out forwards;z-index:10;text-shadow:0 2px 4px rgba(0,0,0,.4)}
+@keyframes scorePop{0%{opacity:1;transform:translate(-50%,0) scale(.8)}50%{transform:translate(-50%,-40px) scale(1.2)}100%{opacity:0;transform:translate(-50%,-70px) scale(.8)}}
+
+/* 开始/结果界面 */
+.overlay{position:absolute;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;transition:opacity .3s}
+.overlay.hidden{opacity:0;pointer-events:none}
+.overlay h2{color:#fff;font-size:28px;font-weight:800;margin-bottom:8px;text-shadow:0 2px 8px rgba(0,0,0,.3)}
+.overlay .subtitle{color:rgba(255,255,255,.7);font-size:14px;margin-bottom:30px}
+.btn{background:linear-gradient(135deg,#FFD93D,#FF6B6B);color:#fff;border:none;border-radius:30px;padding:16px 48px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(255,107,107,.4);transition:all .2s;letter-spacing:1px}
+.btn:active{transform:scale(.95);box-shadow:0 2px 8px rgba(255,107,107,.4)}
+
+/* 结果展示 */
+#result{display:none;flex-direction:column;align-items:center}
+#result .rating{font-size:64px;margin:20px 0}
+#result .final-score{font-size:48px;font-weight:800;color:#FFD93D;text-shadow:0 2px 8px rgba(0,0,0,.3)}
+#result .score-label{color:rgba(255,255,255,.6);font-size:13px;margin-top:4px}
+#result .best-score{color:rgba(255,255,255,.5);font-size:14px;margin:12px 0 30px}
+#result .comment{color:rgba(255,255,255,.8);font-size:15px;margin-bottom:24px;text-align:center;max-width:280px;line-height:1.6}
+
+/* 装饰 */
+.deco{position:absolute;pointer-events:none;opacity:.06;color:#fff}
+.deco1{font-size:120px;top:5%;right:-20px;transform:rotate(15deg)}
+.deco2{font-size:80px;bottom:10%;left:-15px;transform:rotate(-10deg)}
+</style>
+</head>
+<body>
+
+<div id="game">
+  <div class="deco deco1">🎯</div>
+  <div class="deco deco2">⚡</div>
+
+  <div id="title">
+    <h1>Emoji大作战</h1>
+    <p>30秒手速极限挑战</p>
+  </div>
+
+  <div id="info-bar">
+    <div class="info-box">
+      <div class="info-label">得分</div>
+      <div class="info-value" id="score-value">0</div>
+    </div>
+    <div class="info-box">
+      <div class="info-label">倒计时</div>
+      <div class="info-value" id="timer-value">30</div>
+    </div>
+  </div>
+
+  <div id="grid"></div>
+
+  <!-- 开始界面 -->
+  <div class="overlay" id="start-screen">
+    <div style="font-size:72px;margin-bottom:16px">🚀</div>
+    <h2>Emoji大作战</h2>
+    <p class="subtitle">点击出现的Emoji得分，避开💣炸弹！</p>
+    <div style="color:rgba(255,255,255,.5);font-size:13px;margin-bottom:24px;text-align:center;line-height:1.8">
+      ⭐ 星星 +5分 &nbsp; 😎 表情 +2分<br>
+      💣 炸弹 -3分 &nbsp; 🔥 火焰 +8分
+    </div>
+    <button class="btn" id="start-btn">开始挑战</button>
+  </div>
+
+  <!-- 结果界面 -->
+  <div class="overlay hidden" id="result-screen">
+    <div id="result">
+      <div class="rating" id="rating-emoji">🏆</div>
+      <div class="final-score" id="final-score">0</div>
+      <div class="score-label">最终得分</div>
+      <div class="best-score" id="best-score">历史最高: 0</div>
+      <div class="comment" id="result-comment"></div>
+      <button class="btn" id="restart-btn">再来一局</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var EMOJIS = [
+    {char:'😎',score:2,weight:30},
+    {char:'😄',score:2,weight:30},
+    {char:'🥳',score:3,weight:20},
+    {char:'⭐',score:5,weight:15},
+    {char:'🔥',score:8,weight:8},
+    {char:'💣',score:-3,weight:12}
+  ];
+
+  var GAME_TIME = 30;
+  var GRID_SIZE = 9;
+  var SPAWN_INTERVAL = 700;
+  var POP_DURATION = 1200;
+
+  var grid = document.getElementById('grid');
+  var cells = [];
+  var scoreEl = document.getElementById('score-value');
+  var timerEl = document.getElementById('timer-value');
+  var startScreen = document.getElementById('start-screen');
+  var resultScreen = document.getElementById('result-screen');
+  var startBtn = document.getElementById('start-btn');
+  var restartBtn = document.getElementById('restart-btn');
+
+  var score = 0;
+  var timeLeft = GAME_TIME;
+  var gameRunning = false;
+  var activeCells = {};
+  var spawnTimer = null;
+  var countdownTimer = null;
+  var popTimers = {};
+
+  // 初始化网格
+  function initGrid(){
+    grid.innerHTML = '';
+    cells = [];
+    for (var i = 0; i < GRID_SIZE; i++){
+      var cell = document.createElement('div');
+      cell.className = 'cell';
+      var emoji = document.createElement('span');
+      emoji.className = 'emoji';
+      cell.appendChild(emoji);
+      (function(idx){
+        cell.addEventListener('touchstart', function(e){
+          e.preventDefault();
+          hitCell(idx);
+        }, {passive:false});
+        cell.addEventListener('click', function(){
+          hitCell(idx);
+        });
+      })(i);
+      grid.appendChild(cell);
+      cells.push(cell);
+    }
+  }
+
+  // 加权随机选emoji
+  function pickEmoji(){
+    var totalWeight = 0;
+    for (var i = 0; i < EMOJIS.length; i++) totalWeight += EMOJIS[i].weight;
+    var r = Math.random() * totalWeight;
+    for (var i = 0; i < EMOJIS.length; i++){
+      r -= EMOJIS[i].weight;
+      if (r <= 0) return EMOJIS[i];
+    }
+    return EMOJIS[0];
+  }
+
+  // 随机弹出
+  function spawnEmoji(){
+    if (!gameRunning) return;
+    var available = [];
+    for (var i = 0; i < GRID_SIZE; i++){
+      if (activeCells[i] == null) available.push(i);
+    }
+    if (available.length === 0) return;
+
+    var idx = available[Math.floor(Math.random() * available.length)];
+    var emojiData = pickEmoji();
+    var cell = cells[idx];
+    var emojiEl = cell.querySelector('.emoji');
+    emojiEl.textContent = emojiData.char;
+    cell.classList.add('active');
+    cell.classList.remove('hit');
+    activeCells[idx] = emojiData;
+
+    // 自动消失
+    popTimers[idx] = setTimeout(function(){
+      if (activeCells[idx]){
+        cell.classList.remove('active');
+        delete activeCells[idx];
+        delete popTimers[idx];
+      }
+    }, POP_DURATION);
+  }
+
+  // 点击处理
+  function hitCell(idx){
+    if (!gameRunning) return;
+    var data = activeCells[idx];
+    if (!data) return;
+
+    var cell = cells[idx];
+    cell.classList.add('hit');
+    cell.classList.remove('active');
+    delete activeCells[idx];
+    if (popTimers[idx]){
+      clearTimeout(popTimers[idx]);
+      delete popTimers[idx];
+    }
+
+    // 更新分数
+    score += data.score;
+    if (score < 0) score = 0;
+    scoreEl.textContent = score;
+    scoreEl.style.transform = 'scale(1.3)';
+    setTimeout(function(){ scoreEl.style.transform = 'scale(1)'; }, 200);
+
+    // 分数飘字
+    var pop = document.createElement('div');
+    pop.className = 'score-pop';
+    pop.textContent = (data.score > 0 ? '+' : '') + data.score;
+    pop.style.color = data.score > 0 ? '#FFD93D' : '#FF6B6B';
+    pop.style.left = '50%';
+    pop.style.top = '50%';
+    cell.appendChild(pop);
+    setTimeout(function(){ if (pop.parentNode) pop.parentNode.removeChild(pop); }, 600);
+
+    // 粒子效果
+    if (data.score > 0){
+      for (var p = 0; p < 4; p++){
+        var particle = document.createElement('div');
+        particle.className = 'particle';
+        particle.textContent = '✨';
+        particle.style.left = '50%';
+        particle.style.top = '50%';
+        var angle = (p / 4) * Math.PI * 2;
+        var dist = 40 + Math.random() * 20;
+        particle.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+        particle.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
+        cell.appendChild(particle);
+        (function(particle){
+          setTimeout(function(){ if (particle.parentNode) particle.parentNode.removeChild(particle); }, 500);
+        })(particle);
+      }
+    }
+
+    // 短暂延迟后重置cell
+    setTimeout(function(){
+      cell.classList.remove('hit');
+    }, 200);
+  }
+
+  // 开始游戏
+  function startGame(){
+    score = 0;
+    timeLeft = GAME_TIME;
+    scoreEl.textContent = '0';
+    timerEl.textContent = GAME_TIME;
+    timerEl.style.color = '#FF6B6B';
+    gameRunning = true;
+    activeCells = {};
+    popTimers = {};
+
+    // 清理所有cell状态
+    for (var i = 0; i < GRID_SIZE; i++){
+      cells[i].classList.remove('active', 'hit');
+    }
+
+    startScreen.classList.add('hidden');
+    resultScreen.classList.add('hidden');
+
+    // 倒计时
+    countdownTimer = setInterval(function(){
+      timeLeft--;
+      timerEl.textContent = timeLeft;
+      if (timeLeft <= 5){
+        timerEl.style.color = '#FF0000';
+        timerEl.style.transform = 'scale(1.2)';
+        setTimeout(function(){ timerEl.style.transform = 'scale(1)'; }, 200);
+      }
+      if (timeLeft <= 0){
+        endGame();
+      }
+    }, 1000);
+
+    // Emoji生成循环
+    function spawnLoop(){
+      if (!gameRunning) return;
+      spawnEmoji();
+      // 随时间加快速度
+      var elapsed = GAME_TIME - timeLeft;
+      var interval = Math.max(300, SPAWN_INTERVAL - elapsed * 15);
+      spawnTimer = setTimeout(spawnLoop, interval);
+    }
+    spawnLoop();
+  }
+
+  // 结束游戏
+  function endGame(){
+    gameRunning = false;
+    clearInterval(countdownTimer);
+    clearTimeout(spawnTimer);
+
+    // 清理活跃cell
+    for (var i = 0; i < GRID_SIZE; i++){
+      cells[i].classList.remove('active', 'hit');
+      if (popTimers[i]) clearTimeout(popTimers[i]);
+    }
+    activeCells = {};
+    popTimers = {};
+
+    // 读取历史最高分
+    var best = 0;
+    try { best = parseInt(localStorage.getItem('emoji_battle_best') || '0'); } catch(e){}
+    var isNewBest = score > best;
+    if (isNewBest){
+      best = score;
+      try { localStorage.setItem('emoji_battle_best', String(best)); } catch(e){}
+    }
+
+    // 评级
+    var rating, comment;
+    if (score >= 80){ rating = '👑'; comment = '手速王者！你已经超越了99%的玩家！'; }
+    else if (score >= 60){ rating = '🏆'; comment = '太厉害了！你的反应速度非常出色！'; }
+    else if (score >= 40){ rating = '🥇'; comment = '不错的成绩！再练练就能进高手榜了！'; }
+    else if (score >= 25){ rating = '🥈'; comment = '还不错的表现，继续加油！'; }
+    else if (score >= 10){ rating = '🥉'; comment = '别灰心，多玩几次会越来越好的！'; }
+    else { rating = '💪'; comment = '第一次玩吧？再来一次试试看！'; }
+
+    document.getElementById('rating-emoji').textContent = rating;
+    document.getElementById('final-score').textContent = score;
+    document.getElementById('best-score').textContent = '历史最高: ' + best + (isNewBest ? ' 🎉新纪录！' : '');
+    document.getElementById('result-comment').textContent = comment;
+
+    resultScreen.classList.remove('hidden');
+  }
+
+  // 事件绑定
+  startBtn.addEventListener('click', startGame);
+  restartBtn.addEventListener('click', startGame);
+
+  // 初始化
+  initGrid();
+
+  // 阻止双指缩放
+  document.addEventListener('gesturestart', function(e){ e.preventDefault(); });
+  document.addEventListener('dblclick', function(e){ e.preventDefault(); });
+})();
+</script>
+</body>
+</html>
